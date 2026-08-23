@@ -24,11 +24,32 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    mo.image(
-        "https://raw.githubusercontent.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/main/reports/dag-carbon-reproduction/images/headline_result.png",
-        width=900,
-        rounded=True,
-    )
+    mo.Html(r"""
+    <svg viewBox="0 0 900 350" role="img"
+         aria-label="Paper and observed carbon savings for three claims"
+         style="width:100%;max-width:900px;font-family:system-ui,sans-serif;background:#f8fafc;border-radius:14px">
+      <text x="28" y="38" font-size="22" font-weight="700" fill="#17202a">Carbon savings: paper vs. reproduction</text>
+      <rect x="610" y="20" width="18" height="12" rx="2" fill="#aab4c3"/><text x="636" y="31" font-size="13" fill="#46515f">Paper</text>
+      <rect x="700" y="20" width="18" height="12" rx="2" fill="#087f8c"/><text x="726" y="31" font-size="13" fill="#46515f">Observed</text>
+
+      <text x="28" y="92" font-size="15" fill="#273444">Homogeneous, S=1</text>
+      <rect x="218" y="69" width="375" height="20" rx="4" fill="#aab4c3"/><text x="603" y="84" font-size="14" fill="#273444">25.0%</text>
+      <rect x="218" y="95" width="314" height="20" rx="4" fill="#087f8c"/><text x="542" y="110" font-size="14" font-weight="700" fill="#087f8c">20.93%</text>
+
+      <text x="28" y="175" font-size="15" fill="#273444">Heterogeneous, S=1</text>
+      <rect x="218" y="152" width="270" height="20" rx="4" fill="#aab4c3"/><text x="498" y="167" font-size="14" fill="#273444">18.0%</text>
+      <rect x="218" y="178" width="309" height="20" rx="4" fill="#087f8c"/><text x="537" y="193" font-size="14" font-weight="700" fill="#087f8c">20.60%</text>
+
+      <text x="28" y="258" font-size="15" fill="#273444">Homogeneous, S=2</text>
+      <rect x="218" y="235" width="540" height="20" rx="4" fill="#aab4c3"/><text x="768" y="250" font-size="14" fill="#273444">54.0%</text>
+      <rect x="218" y="261" width="545" height="20" rx="4" fill="#087f8c"/><text x="773" y="276" font-size="14" font-weight="700" fill="#087f8c">54.52%</text>
+
+      <line x1="218" y1="307" x2="818" y2="307" stroke="#b8c2cc"/>
+      <text x="218" y="329" text-anchor="middle" font-size="12" fill="#65717f">0%</text>
+      <text x="518" y="329" text-anchor="middle" font-size="12" fill="#65717f">30%</text>
+      <text x="818" y="329" text-anchor="middle" font-size="12" fill="#65717f">60%</text>
+    </svg>
+    """)
     return
 
 

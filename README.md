@@ -1,7 +1,5 @@
 # Reproduction: carbon-aware DAG scheduling at fixed makespan
 
-[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/blob/main/notebooks/dag_carbon_reproduction.py)
-
 We tested the headline claims of **[Quantifying the Carbon Reduction of DAG Workloads: A Job Shop Scheduling Perspective](https://www.alphaxiv.org/abs/2512.07799)**. Using the authors' pinned AU-SA 2024 trace and DAG pool, an OR-Tools CP-SAT reimplementation found **20.93% carbon savings at the same optimal makespan** on homogeneous servers (paper: **25%**) and **20.60%** on heterogeneous servers (paper: **18%**). With paper-proportional solver limits and $S=2$, homogeneous savings were **54.52%** (paper: **54%**).
 
 **Assessment: aligned at downscaled scale.** The $S=1$ differences were −4.07 and +2.60 percentage points; the $S=2$ difference was +0.52 points. The main substitutions were 8–24 rather than 1,000 instances per condition, 10/30/50-second rather than 60/180/300-second CP-SAT limits, seeded random trace dates, and an equivalent start-time carbon lookup. Runs executed on the user-provided Vast.ai SSH host alias `paper2607-rtx3090`; constraint solving was CPU-bound.
