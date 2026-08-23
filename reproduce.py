@@ -91,6 +91,12 @@ def solve(
                 choices.append(present)
                 presences[(j, t, m)] = present
 
+                # A slow heterogeneous alternative can exceed a tight S=1
+                # horizon. It is simply unavailable for that constrained solve.
+                if duration > horizon:
+                    model.add(present == 0)
+                    continue
+
                 if objective == "carbon":
                     latest = horizon - duration
                     prefix = [0]
