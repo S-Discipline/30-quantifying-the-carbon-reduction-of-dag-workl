@@ -1,0 +1,4 @@
+claim,n,normal_95ci_halfwidth_pct,observed_pct,paper_pct
+Homogeneous S=1,24,6.9834,20.9341,25.0
+Heterogeneous S=1,16,11.1004,20.5996,18.0
+Homogeneous S=2,8,17.2437,54.5157,54.0
