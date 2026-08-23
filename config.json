@@ -1,9 +1,10 @@
 {
-  "instances": 16,
+  "instances": 8,
   "jobs_per_instance": 10,
   "seed": 42,
-  "server_modes": ["homogeneous", "heterogeneous"],
+  "server_modes": ["homogeneous"],
   "solver_timeout_s": 10,
+  "solver_timeout_s_by_stretch": {"1.0": 10, "1.5": 30, "2.0": 50},
   "stretch_factors": [1.0, 1.5, 2.0],
   "paper_targets": {
     "homogeneous": {"1.0": 25.0, "2.0": 54.0},

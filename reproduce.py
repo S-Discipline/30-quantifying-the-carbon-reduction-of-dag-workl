@@ -211,9 +211,12 @@ def main() -> None:
 
             for stretch in cfg["stretch_factors"]:
                 limit = int(math.ceil(stretch * baseline.makespan))
+                aware_timeout = cfg.get("solver_timeout_s_by_stretch", {}).get(
+                    str(stretch), cfg["solver_timeout_s"]
+                )
                 aware = solve(
                     durations, parents, arrivals_all[instance], carbon, powers, coeffs,
-                    "carbon", cfg["solver_timeout_s"], cfg["seed"] + instance,
+                    "carbon", aware_timeout, cfg["seed"] + instance,
                     makespan_limit=limit,
                 )
                 if aware.carbon_g is None:
@@ -226,6 +229,7 @@ def main() -> None:
                     "stretch": stretch,
                     "baseline_status": baseline.status,
                     "aware_status": aware.status,
+                    "aware_timeout_s": aware_timeout,
                     "baseline_makespan": baseline.makespan,
                     "aware_makespan": aware.makespan,
                     "baseline_carbon_g": round(baseline.carbon_g, 4),
