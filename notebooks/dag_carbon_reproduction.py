@@ -80,21 +80,21 @@ def _(mo):
             "Paper (%)": 25.0,
             "Observed (%)": 20.93,
             "n": 24,
-            "Assessment": "Aligned",
+            "Assessment": "Direction supported; numeric gap 16.3%",
         },
         {
             "Claim": "Heterogeneous S=1",
             "Paper (%)": 18.0,
             "Observed (%)": 20.60,
             "n": 16,
-            "Assessment": "Aligned",
+            "Assessment": "Direction supported; numeric gap 14.4%",
         },
         {
             "Claim": "Homogeneous S=2",
             "Paper (%)": 54.0,
             "Observed (%)": 54.52,
             "n": 8,
-            "Assessment": "Aligned under proportional timeouts",
+            "Assessment": "Supported; numeric gap 1.0%",
         },
     ]
     mo.ui.table(summary, selection=None, label="Paper and observed results")
@@ -210,10 +210,13 @@ def _(mo):
     mo.md(r"""
     ## What this evidence does—and does not—establish
 
-    **Supported here:** carbon-aware reordering can cut operational emissions
-    without extending the optimal makespan; proportional search time recovers
-    the reported $S=2$ endpoint; higher utilization is descriptively
-    associated with lower savings.
+    **Overall grade: C — partial reproduction success (medium confidence).**
+    Carbon-aware reordering reduced operational emissions without extending
+    the optimal makespan, and proportional search time recovered the reported
+    homogeneous $S=2$ endpoint. However, the two $S=1$ means differ from the
+    paper by 16.3% and 14.4%, beyond the 10% reference used when the paper gives
+    no uncertainty interval. The heterogeneous $S=2$ endpoint and several core
+    ablations were not supported or not attempted.
 
     **Still open:** the paper's energy-vs-carbon objective comparison, server
     count and task count sweeps, regional carbon traces, and a full 1,000-case

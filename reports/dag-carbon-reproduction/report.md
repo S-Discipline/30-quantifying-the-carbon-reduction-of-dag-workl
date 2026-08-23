@@ -1,108 +1,100 @@
-# Reproducing Carbon-Aware Scheduling for DAG Workloads
+# DAG 工作负载碳感知调度：统一标准复现审计
 
-![Paper and observed carbon savings](images/headline_result.png)
+![论文值与本次实测值](images/headline_result.png)
 
-## The central question and answer
+**最终等级：C（部分复现成功）｜结论可信度：中。** 本次代码确实在约定的 SSH 机器上完成了实例级求解，并支持“碳感知调度能在不延长最优 makespan 时降低碳排放”这一方向性结论；但两个 $S=1$ 核心均值与论文的相对差异都超过 10%，异构 $S=2$ 结果相差 51.1%，且能耗权衡、服务器数、任务数和地区消融均未复现。因此不能判为 A 或 B。
 
-Can a scheduler reduce a dependency-constrained batch workload's operational carbon emissions without delaying its completion? In our downscaled reproduction of Bostandoost et al. ([arXiv:2512.07799](https://www.alphaxiv.org/abs/2512.07799)), the answer was yes.
+## 1. 本次实际复现了什么？
 
-At the paper's no-slack setting, $S=1$, carbon-aware schedules reduced emissions by **20.93% on homogeneous servers** versus the paper's 25%, and by **20.60% on heterogeneous servers** versus 18%. With proportional solver budgets and $S=2$, homogeneous savings reached **54.52%**, almost exactly the paper's 54%. These are aligned results under a smaller sample and shorter search budget, not a full-scale reproduction.
+我们重新实现了论文的两层 OR-Tools CP-SAT 优化：先最小化 makespan 得到 $C_{OPT}$，再约束 `makespan <= ceil(S × C_OPT)` 并最小化逐时段碳排放。正式运行使用作者仓库固定提交 [`cc312ef`](https://github.com/rbostandoust/GreenSys26-DAG/commit/cc312ef7d238d56d7114053dcdd04685b8a6a4d7) 中的 AU-SA 2024 Electricity Maps 数据和四操作 DAG 池。
 
-The most important qualification is computational: simply enlarging the feasible scheduling window without giving CP-SAT more search time produced poor or missing solutions. The paper's 1×/3×/5× timeout policy is consequential to the headline stretch result.
+实际完成的实验为：
 
-## Claim-by-claim assessment
+- 同构服务器、$S=1$：24 个实例。
+- 同构与异构服务器、$S=1,1.5,2$：各 16 个实例，所有碳优化求解统一限时 10 秒。
+- 同构服务器、$S=1,1.5,2$：8 个实例，碳优化限时按 10/30/50 秒递增。
 
-| Empirical claim | Paper result | Observed result | Assessment | Formal compute |
-|---|---:|---:|---|---|
-| Carbon savings with no makespan loss, homogeneous $S=1$ | 25.0% | 20.93%, $n=24$, descriptive 95% CI ±6.98 pp | **Aligned**; 4.07 pp lower, with the paper value inside the descriptive interval | 4m27s |
-| Carbon savings with no makespan loss, heterogeneous $S=1$ | 18.0% | 20.60%, $n=16$, descriptive 95% CI ±11.10 pp | **Aligned**; 2.60 pp higher | 16m41s sweep, which also tested stretch |
-| Homogeneous savings at $S=2$ | 54.0% | 54.52%, $n=8$, descriptive 95% CI ±17.24 pp | **Aligned under proportional timeouts**; 0.52 pp higher | 12m26s |
-| Doubling makespan flexibility nearly doubles homogeneous savings | 25% → 54% (2.16×) | 31.16% → 54.52% (1.75×) on the same $n=8$ subset | **Partially aligned**; direction and endpoint align, relative gain is smaller | 12m26s |
-| Default homogeneous utilization | 47.15% | 47.45%, $n=24$ | **Aligned**; 0.30 pp higher | Included in 4m27s baseline |
-| Heterogeneous carbon–energy trade-off (Fig. 7) | Up to 7% energy gap; at $S=2$, ~50% vs ~30% carbon savings and ~3% vs ~10% energy savings | Not attempted | **Not attempted** | — |
-| More servers yield up to 30× higher savings (Table 1a) | 1.13% → 33.98% for $M=2→10$ | Not attempted | **Not attempted** | — |
-| More tasks reduce savings by up to 35% (Table 1b) | 30.43% → 19.69% for $k=3→5$ | Not attempted | **Not attempted** | — |
-| Carbon-trace region changes achievable savings (Fig. 6) | Qualitative regional differences | Not attempted | **Not attempted** | — |
+三次成功运行共用时 33 分 34 秒。所有报告数字都可从本次运行日志中的 `INSTANCE_RESULT`、`SUMMARY` 和 `FINAL_RESULT` 逐项追溯；CSV 是从这些日志重新解析生成的，并非复制论文或 README 数字。所有 makespan 基线均由求解器标记为 `OPTIMAL`；碳优化结果大多只达到 `FEASIBLE`，因此是限时条件下找到的解，不是已证明的碳最优上界。
 
-The three successful evidence runs used **33m34s total wall-clock time** on the user-provided Vast.ai SSH machine (`paper2607-rtx3090`). The workload was CPU-bound constraint programming; the RTX 3090 was not used for acceleration. A monetary cost cannot be recovered from the run evidence. One 9-minute partial sweep crashed after completing its homogeneous half; it is retained only because it led to the heterogeneous-horizon repair.
+## 2. 哪些内容没有复现？
 
-## The implementation follows the paper's two-level optimization
+- 图 7 的碳优化与能耗优化对比，以及“碳最优方案最多多用 7% 能源”。
+- 表 1a 的服务器数量消融及“最多提高 30 倍碳节省”。
+- 表 1b 的每作业任务数消融及“最多降低 35% 碳节省”。
+- 图 6 的 CAL、CA-ON、TEX 与 AU-SA 地区对比。
+- 每个条件 1,000 个实例、论文完整的 60/180/300 秒求解预算。
+- 多随机种子、论文未披露的确切随机种子、硬件、线程数、OR-Tools 版本和日期抽样编排。
 
-The implementation uses the authors' released AU-SA 2024 Electricity Maps trace and four-operation DAG pool, pinned to upstream commit [`cc312ef`](https://github.com/rbostandoust/GreenSys26-DAG/commit/cc312ef7d238d56d7114053dcdd04685b8a6a4d7). Each instance contains 10 jobs, four operations per job, five servers, arrivals within 24 hours, and 15-minute epochs.
+## 3–4. 每个核心结论是否得到支持，数值相差多少？
 
-The consequential path in [`reproduce.py`](../../reproduce.py) is:
+论文没有报告可用于均值比较的方差或置信区间。因此，按统一标准使用 **相对差异不超过 10%** 作为临时数值接近参考。本次小样本的置信区间只描述本次结果波动，不用于替代论文缺失的误差范围。
 
-1. Sample jobs, DAG parents, arrivals, and a start date deterministically.
-2. Build one optional interval per task–machine alternative.
-3. Enforce exactly-one machine assignment, DAG precedence, arrivals, and per-machine `NoOverlap`.
-4. Minimize makespan and record the optimal $C_{\mathrm{OPT}}$.
-5. Rebuild the same instance with `makespan <= ceil(S × C_OPT)` and minimize time-indexed carbon cost.
-6. Compare each carbon-aware result with its paired makespan-only schedule.
+| 核心结论 | 论文结果 | 本次实测 | 方向 | 相对差异 | 判定 |
+|---|---:|---:|---|---:|---|
+| 同构 $S=1$：不增加最优 makespan 仍可降低碳排 | 25.0% | 20.9341%，$n=24$ | 一致：节省为正 | **16.26%** | **部分支持**：方向一致，数值不满足 10% 参考 |
+| 异构 $S=1$：不增加最优 makespan 仍可降低碳排 | 18.0% | 20.5996%，$n=16$ | 一致：节省为正 | **14.44%** | **部分支持**：方向一致，数值不满足 10% 参考 |
+| $S=1$ 时同构节省高于异构 | 25% > 18%，差 7 pp | 同一 16 实例集合为 23.1309% > 20.5996%，差 2.5313 pp | 一致 | 差值幅度相差 **63.84%** | **部分支持**：排序一致，差距明显偏小 |
+| 同构 $S=2$ 平均节省约 54% | 54.0% | 54.5157%，$n=8$，10/30/50 秒 | 一致 | **0.96%** | **支持**：端点数值接近 |
+| 放宽 makespan 会提高同构碳节省 | 25% → 54% | 同一 8 实例集合为 31.1637% → 47.8975% → 54.5157% | 一致：均值单调上升 | — | **支持方向** |
+| 将 $S$ 从 1 提到 2 会使同构节省“接近翻倍” | 2.16× | 1.749× | 一致：增幅为正 | **19.01%** | **部分支持**：趋势一致，倍率不接近 |
+| 异构 $S=2$ 平均节省约 52% | 52.0% | 25.4405%，$n=16$，统一 10 秒 | 仅端点高于 $S=1$；$S=1.5→2$ 反向下降 | **51.08%** | **本设置下不支持／证据不足**：预算与论文不一致 |
+| 异构利用率高于同构，从而限制迁移空间 | 55.02% > 47.15% | 47.3398% ≈ 47.2822%（同一 16 实例） | 不一致 | 异构利用率相差 **13.96%** | **本设置下不支持**；提示模型或利用率口径仍有差异 |
+| 默认同构利用率约 47.15% | 47.15% | 47.4501%，$n=24$ | 一致 | **0.64%** | **支持** |
+| 碳—能耗权衡、服务器数、任务数、地区效应 | 论文图 6–7、表 1 | 未运行 | 未判断 | — | **未复现** |
 
-The carbon objective uses a precomputed start-time lookup rather than the release's per-epoch active Boolean variables:
+“统一 10 秒”同构扫参只有 11/16 个 $S=2$ 求解返回可行结果，均值从 23.13% 降到 7.54%，不能支持论文趋势。把预算改为与论文相同的 1×/3×/5×比例后，8 个实例全部返回可行解并恢复单调趋势。这说明求解预算是实验条件的一部分；后者只能支持同构趋势，不能补足异构 $S=2$ 或其他未运行结论。
 
-```python
-model.add_element(safe_start, costs, raw_cost)
-model.add(active_cost == raw_cost).only_enforce_if(present)
-model.add(makespan <= makespan_limit)
-model.minimize(sum(task_costs))
-```
+![不同求解预算下的伸缩趋势](images/timeout_sensitivity.png)
 
-This is an equivalent discrete objective but produces a smaller CP-SAT model. The heterogeneous powers $[0.25, 0.5, 1, 1.5, 2]$ kW are a constant rescaling of the release's normalized $[1,2,4,6,8]$, so assignments and percentage savings are invariant to that factor.
+## 5. 差异可能来自哪里？
 
-## Savings exist at the same optimal makespan, but vary widely
+| 条件 | 论文 | 本次复现 | 可能影响 |
+|---|---|---|---|
+| 数据 | AU-SA 2024；作者 DAG 生成数据 | 相同来源并固定上游提交 | 这一部分基本一致 |
+| 每实例规模 | $n=10$ 作业、$k=4$ 任务、$M=5$ 服务器 | 相同 | 基本一致 |
+| 样本数 | 每条件 1,000 | 24、16 或 8 | 均值方差很大，容易受少数日期和 DAG 影响 |
+| 随机性 | 随机 trace 起点；种子数与种子未披露 | 一个生成种子 42；日期另用确定性派生种子 | 样本集合不同，不能视为同一统计重复 |
+| 碳求解时限 | $S=1/1.5/2$ 分别 60/180/300 秒 | 10 秒统一扫参；聚焦实验为 10/30/50 秒 | 大搜索空间中解质量和可行解覆盖率会下降 |
+| 硬件/线程 | 论文未披露 | Vast.ai SSH 主机；OR-Tools 8 个 search workers；GPU 未使用 | 多线程 CP-SAT 非完全确定；CPU 性能影响限时解质量 |
+| 软件版本 | 论文仅说明 Google OR-Tools，未给版本 | OR-Tools 9.14.6206 | 求解启发式和限时结果可能变化 |
+| 碳目标实现 | 作者按 epoch 活跃变量建模 | 等价的开始时间成本查表 | 理论目标相同，但模型规模与搜索路径不同 |
+| 最优性 | makespan 最优；碳求解有时限 | makespan 均为 `OPTIMAL`；碳解通常为 `FEASIBLE` | 碳节省是当前可行解，不一定是该实例最优值 |
+| 异构利用率 | 55.02% | 47.34% | 明显不一致，可能来自利用率定义、抽样或实现细节；会削弱异构结论可比性 |
 
-![Per-instance savings distributions](images/instance_distributions.png)
+![各实例结果分布](images/instance_distributions.png)
 
-All makespan-only baselines in the reported runs were solver-certified `OPTIMAL`. Carbon-aware solves were accepted when CP-SAT returned a feasible schedule inside the required makespan bound. At $S=1$, aware and baseline schedules therefore have the same optimal makespan; on homogeneous servers they also consume identical energy, so savings arise solely by reordering work into lower-carbon epochs.
+本次同构 $S=1$ 标准差为 17.45 个百分点，实例结果从 2.73% 到 66.82%。如此宽的分布意味着 8–24 个实例不足以稳定估计论文的 1,000 实例均值。
 
-The distribution is broad. The homogeneous $S=1$ standard deviation was 17.45 percentage points, and individual savings ranged from 2.73% to 66.82%. The spread explains why the 24-instance mean (20.93%) should not be treated as a precise estimate of the paper's 1,000-instance mean.
+## 6–8. 统一等级、最终结论与可信度
 
-## Solver time is part of the stretch-factor result
+- **最终等级：C（部分复现成功）。**
+- **最终结论：部分成功。** 代码与真实实验均运行成功；同构 $S=2$ 端点、放宽 makespan 的同构方向、默认同构利用率得到支持；两个 $S=1$ 核心碳节省只支持方向、不满足 10% 数值参考；异构 $S=2$ 和异构利用率机制未得到支持；多个核心消融未尝试。
+- **结论可信度：中。** “实际运行过”和“方向性节省存在”的证据可信度较高，但总体等级受小样本、单种子、短求解时限、异构利用率不匹配和大量未运行实验限制。
 
-![Timeout sensitivity](images/timeout_sensitivity.png)
+![利用率与节省的描述性关系](images/utilization_vs_savings.png)
 
-With one 10-second cap at every stretch, homogeneous mean savings fell from 23.13% at $S=1$ to 7.54% at $S=2$, and only 11 of 16 $S=2$ searches returned a feasible schedule. This run did not show the paper's reported stretch effect under equal time limits.
+上图的 $r=-0.46$ 仅是本次 24 个同构实例中的描述性相关，论文没有报告同一相关系数，因此它不能作为论文数值结论的复现证据。
 
-That divergence is diagnostic rather than contradictory: a larger horizon creates a larger search space. On a focused eight-instance child using 10/30/50 seconds for $S=1/1.5/2$—the same 1×/3×/5× policy as the paper—mean savings increased monotonically from 31.16% to 47.90% to 54.52%. Every solve returned a feasible schedule. The paper itself notes that large-$S$ heterogeneous runs can yield negative savings when the timeout prevents a good solution.
+## 9. 怎样提高复现等级？
 
-## Utilization supports the proposed mechanism
+要从 C 提升到 B，至少需要：
 
-![Utilization versus savings](images/utilization_vs_savings.png)
+1. 在相同实现上将四个主要点扩大到足够样本，并使用论文的 60/180/300 秒时限；优先完成同构与异构的 $S=1,1.5,2$ 全矩阵。
+2. 先查清异构利用率 47.34% 与论文 55.02% 的差异，包括作者利用率公式、机器选择集合、持续时间取整和随机实例编排；在此之前不应宣称异构设置等价。
+3. 增加多个预先声明的随机种子，报告均值、标准差和置信区间；如果作者能提供种子和实例清单，应直接使用。
+4. 完成碳目标与能耗目标的公平对比，并复现服务器数、任务数和地区三组关键消融。
 
-At homogeneous $S=1$, baseline utilization averaged 47.45%, closely matching the paper's 47.15%. Across the 24 paired instances, utilization and carbon savings had a descriptive Pearson correlation of $r=-0.46$: busier schedules tended to leave fewer idle gaps in which tasks could be moved to cleaner epochs.
+要达到 A，还需要基本匹配论文每条件 1,000 实例、完整参数和求解预算，确认 OR-Tools 版本及线程/硬件条件，并让全部核心方向和主要数值在论文误差范围内；若论文仍不提供误差范围，则主要指标至少应满足预先约定的数值容差。
 
-This is mechanism-consistent evidence, not a causal estimate. Carbon-trace variability, DAG shape, job duration, and the arbitrary carbon footprint of the non-unique makespan-optimal baseline can all affect both the schedule and measured savings.
+## 实现与证据入口
 
-## What was downscaled or substituted
-
-| Dimension | Paper | This reproduction |
-|---|---|---|
-| Instances | 1,000 per reported condition | 24 for the main homogeneous $S=1$ result; 16 for the mixed server sweep; 8 for proportional-timeout stretch |
-| Carbon solver limits | 60/180/300s at $S=1/1.5/2$ | 10s main/equal-budget checks; 10/30/50s proportional check |
-| Trace starts | Described as random points in AU-SA 2024 | Seeded random day offsets in the first 334 days, preserving a 30-day look-ahead |
-| Model | OR-Tools CP-SAT with epoch-active variables | OR-Tools CP-SAT with equivalent start-time cost lookup |
-| Parallelism | Paper experiments distributed across machines | One SSH host; eight CP-SAT search workers per solve |
-| Optimality | Makespan optimum, time-limited carbon search | Same; all baselines optimal, carbon schedules generally feasible rather than proven optimal |
-
-The descriptive confidence intervals use $1.96s/\sqrt{n}$. They summarize observed variation but are not formal population intervals: samples share one seed, the date-selection scheme is finite, and CP-SAT uses multi-threaded search.
-
-## Reproduction and provenance
-
-The fixed command on every formal experiment branch was:
+正式运行命令均为：
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install --quiet -r requirements.txt && .venv/bin/python reproduce.py
 ```
 
-Reader-facing data are in [`data/`](data/) and the figure builder is [`build_report_assets.py`](build_report_assets.py). The formal lineage is:
-
-- [Headline AU-SA baseline](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/headline-au-sa-reproduction-formal-baseline): 24 homogeneous $S=1$ instances.
-- [Stretch and heterogeneity sweep](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/stretch-and-heterogeneity-sweep): 16 instances, two server modes, three stretches, plus the horizon repair.
-- [Proportional timeout stretch check](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/proportional-timeout-stretch-check): eight homogeneous instances with 10/30/50-second caps.
-
-## Assessment and what full scale still needs
-
-The main illustrative claim is **aligned**: carbon-aware DAG scheduling reduced emissions at the optimal makespan, and the observed $S=1$ means were close to the paper's 25%/18%. The $S=2$ homogeneous result is also **aligned when solver time scales with search complexity**, landing at 54.52% versus 54%. Equal short timeouts did not show that effect, which makes solver budget a central part of the result rather than infrastructure trivia.
-
-A full-scale reproduction would still need 1,000 instances per condition, the paper's full 60/180/300-second limits, confirmation of the authors' exact date orchestration and CP-SAT parameters, multiple seeds or deterministic single-worker sensitivity, all four regional traces, server/task-count sweeps, and the carbon-versus-energy objective comparison.
+- [同构 $S=1$ 基线分支](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/headline-au-sa-reproduction-formal-baseline)
+- [同构/异构统一预算扫参分支](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/stretch-and-heterogeneity-sweep)
+- [同构比例预算检查分支](https://github.com/S-Discipline/30-quantifying-the-carbon-reduction-of-dag-workl/tree/orx/proportional-timeout-stretch-check)
+- [`reproduce.py`](../../reproduce.py)、[实例级 CSV](data/)、[制图脚本](build_report_assets.py)

@@ -135,7 +135,7 @@ def main() -> None:
     ax.set_xticks(x, labels)
     ax.set_ylim(0, 78)
     chart_title(ax, "Paper and observed carbon savings",
-                "AU-SA 2024; paired DAG instances; error bars are descriptive normal 95% CIs")
+                "Paper reports no CI; observed error bars describe this small sample and do not establish numeric agreement")
     style(ax)
     ax.legend(frameon=False, loc="upper left")
     save(fig, "headline_result.png")
